@@ -1,0 +1,5 @@
+﻿  answer_no-ten.c
+E:\tinituge-mu @hobokansei\answer_no-ten.c(12,7): warning C4013: 関数 'qsort' は定義されていません。int 型の値を返す外部関数と見なします。
+E:\tinituge-mu @hobokansei\answer_no-ten.c(33,12): warning C4013: 関数 'yaku_serch' は定義されていません。int 型の値を返す外部関数と見なします。
+E:\tinituge-mu @hobokansei\answer_no-ten.c(80): warning C4715: 'answer_noten': 値を返さないコントロール パスがあります。
+  tinituge-mu.vcxproj -> E:\tinituge-mu @hobokansei\Debug\tinituge-mu.exe

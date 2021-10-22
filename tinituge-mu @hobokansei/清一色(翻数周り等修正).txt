@@ -1,0 +1,1107 @@
+
+～～このソフトの概要等～～
+
+
+麻雀の清一色という役限定でのシミュレーション（クイズ形式）ソフト？です。
+
+清一色という役は他の牌との兼ね合いでアガリ条件が複雑になる事も多く
+ある程度麻雀を打ち慣れている方でも一考される場面が多いです。
+そんな清一色を指して、的確な回答を求めてくるクイズがあったら
+暇つぶしにはちょうどいいのではないかと思い、作成しました。
+
+プログラミングを始めて歴も浅く、完成を目指すというより「どこまで出来るかな？」と軽い気持ちで作り始めたものなので
+牌データの扱い方等まだまだ改良出来る点が多々あるかと思われます。
+また、待ち牌についてもある程度のデバッグをして修正をかけていますが、漏れが見つかる可能性もあるかと思われます。
+お忙しいところに拙いプログラムをお送りし、誠に恐縮ではございますが、一度ご確認頂けると幸いです。
+何卒よろしくお願いいたします。
+
+
+花坂
+
+
+
+
+
+～～簡単な操作説明～～
+
+プログラムを開くと手牌13牌+ツモ牌（直近で引いてきた牌）1牌が表示され、選択肢が出てきます。
+状況に応じて以下の3択から選んでいただく形となります。
+
+「0」和了……その14牌で面子が作れており、上がれる形になっている場合。
+「1」聴牌……すぐには上がれないが、どれか1つの牌を捨ててリーチをかけられる状態。
+　　 　　　　牌の下に振っている1～14の番号を確認し、捨てる牌を選んで下さい。
+　　 　　　　その後、残りの13牌に組み合う数字全てを「1つずつEnterを押して」入力し、最後に「0」とEnterを押して確定します。
+「9」不聴……どの牌を入れ替えたとしてもリーチすらかけられない場合。
+
+入力していただくと結果に応じて正解、不正解等の表示が出てきて終了となります。
+
+
+
+
+～～コード～～
+
+
+以下が本ゲームのコードとなります。
+
+
+ヘッダ
+
+
+
+#define FAN	0
+#define TANYAO	1
+#define PINFU	2
+#define TIITOI	3
+#define SANAN	4
+#define SUUAN   5
+#define IIPEI	6
+#define RYANPEI 7
+#define ITTU	8
+#define TYUUREN 9
+
+
+
+extern void kotu_judge(int a[]);
+extern void syuntu_judge(int a[]);
+extern void mati_judge(int x, int y, int h, int d);
+extern void haihyouji();
+extern void furiwake(int a);
+extern void yaku_judge();
+extern int  answer_agari();
+extern int  answer_tenpai();
+extern int  answer_noten();
+extern int  compareInt(const void *a, const void *b);
+
+
+
+int atama, koutu, syuntu;							//牌の組み換え用
+int tehai_data[14];								//ランダム生成時の牌データ
+int draw;										//ツモ牌
+int c, f, i, j, l, r, w;
+int e, yaku_syukai, tumo_check, tumohai;			//牌生成時の同一牌エラーフラグ,　新旧手牌比べ用,　ツモった牌を区別,　ツモった牌の数値入れ込み(平和用)
+int kaburi[9], tehai[9], mati[10],user_mati[10];							//対子、刻子用。。。？,　ランダム生成牌を一～九に振り分け
+int final_answer, flag_sute, flag_mati, flag_agari,flag_furiten, pinflag;			//「上がってますか？」の質問,　牌が余ってリーチをかけれるかフラグ,　平和いけるか判定（予定）
+int sutehai, amari, iipei, ittu, tiitoi, tyuren;	//「聴牌」選択時の牌交換用,　役作りで余った牌の数,　組み込み時同数順子2つ処理,　123 456 789が作れる時用,　2×7役,　九蓮
+
+int yaotyu, yakuman;								//手牌の1と9を判定,　役満フラグ
+int yaku[10][2];								// 1 翻数  2 断幺九  3 平和 4 七対子 5 三暗刻 6 四暗刻 7 一盃口 8 二盃口 9 一気通貫 10 九蓮宝燈
+
+int debug;
+
+
+----------------------------------------------------------------------------------------------
+
+
+メイン
+
+#include<stdio.h>
+#include <time.h>
+#include "hedda.h"
+#include<stdlib.h>
+
+
+int compareInt(const void *a, const void *b);
+
+f = 0;
+
+debug = 0;												// デバッグモード ＝ 1(面子組み立てや待ち等の可視化)
+
+int main(void) {
+
+
+
+	srand(/*(unsigned)*/time(NULL));
+
+
+	for (i = 0; i < 13; i++, e = 0) {
+		tehai_data[i] = rand() % 35 + 1;				//乱数生成
+
+		for (l = 0; l < i; l++) {
+
+			if (tehai_data[i] == tehai_data[l]) {				//手牌被りチェック
+				i--;						//ｎ枚目引き直し
+			}
+		}
+	}
+	//tehai_data[13] = 999;				//drawに入れる用14牌目の空白（0）が手配に組み込まれる対策
+	for (; e == 0;) {
+		e = 1;
+		draw = rand() % 35 + 1;
+
+		for (i = 0; i < 14; i++) {
+			if (tehai_data[i] == draw)
+				e = 0;
+		}
+	}
+
+	for (i = 0; i < 13; i++) {
+		furiwake(tehai_data[i]);
+	}
+	
+	for(i = 0; i < 9; i++)
+	haihyouji(tehai,i);
+	
+	printf("\t");
+	tumo_check++;
+	furiwake(draw);
+	haihyouji(draw);
+	printf("\n");
+
+	for (i = 0; i < 13; i++) {
+		printf("萬 ");
+	}
+	printf("\t");
+	printf("萬\n");
+	printf(" 1  2  3  4  5  6  7  8  9 10 11 12 13  14");
+
+
+	if(debug == 1){
+	printf("\n\n%d  ", tehai_data[0]);
+	printf("%d  ", tehai_data[1]);
+	printf("%d  ", tehai_data[2]);
+	printf("%d  ", tehai_data[3]);
+	printf("%d  ", tehai_data[4]);
+	printf("%d  ", tehai_data[5]);
+	printf("%d  ", tehai_data[6]);
+	printf("%d  ", tehai_data[7]);
+	printf("%d  ", tehai_data[8]);
+	printf("%d  ", tehai_data[9]);
+	printf("%d  ", tehai_data[10]);
+	printf("%d  ", tehai_data[11]);
+	printf("%d  ", tehai_data[12]);
+
+	printf("%d  ", draw);
+	}
+	printf("\n聴牌…1　和了…0　不聴…9\n");
+	printf("聴牌？和了？不聴？:");
+
+	scanf_s("%d", &final_answer);
+
+	if (final_answer == 0) {
+		answer_agari();
+	}
+
+	if (final_answer == 1) {
+		answer_tenpai();
+		}
+	if (final_answer == 9) {
+		answer_noten();
+	}
+	return 0;
+	
+	}
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+回答：アガリ
+
+#include<stdio.h>
+#include"hedda.h"
+
+int answer_agari(){
+
+	tehai_data[13] = draw;
+	for (i = 0; i < 9; i++) {
+		kaburi[i] = 0;
+		tehai[i] = 0;
+	}
+
+	qsort(tehai_data, 13, sizeof(int), compareInt);
+
+	for (i = 0; i < 14; i++) {
+		furiwake(tehai_data[i]);
+	}
+	printf("\n");
+
+	//テスト用
+	//tumohai = 7;				//(0~8)
+
+	/*tehai[0] = 2;
+	tehai[1] = 2;
+	tehai[2] = 2;
+	tehai[3] = 2;
+	tehai[4] = 2;
+	tehai[5] = 2;
+	tehai[6] = 2;
+	tehai[7] = 0;
+	tehai[8] = 0;*/
+
+	tumo_check = 0;
+
+	for (i = 0; i < 9; i++)
+	haihyouji(tehai);
+
+	printf("\n");
+
+	for (i = 0; i < 14; i++) {
+		printf("萬 ");
+	}
+
+	yaku_serch();
+
+	/*for (n = 0; n<11; n++) {*/
+	printf("\n役\n");
+	if (flag_agari == 0) {
+		printf("\n上がれてません！！");
+	} else if (yakuman == 0) {
+		printf("\n門前清自摸和");
+		yaku[FAN][0] += 1;
+		printf("\n清一色");
+		yaku[FAN][0] += 6;
+		if (yaku[TANYAO][0] >= 1)
+			printf("\n断幺九");
+		if (yaku[PINFU][0] >= 1)
+			printf("\n平和");
+		if (yaku[IIPEI][0] >= 1)
+			printf("\n一盃口");
+		if (yaku[ITTU][0] >= 1)
+			printf("\n一気通貫");
+		if (yaku[TIITOI][0] >= 1)
+			printf("\n七対子");
+		if (yaku[RYANPEI][0] >= 1)
+			printf("\n二盃口");
+		if (yaku[SANAN][0] >= 1)
+			printf("\n三暗刻");
+
+		printf("\n%d翻\n\n", yaku[FAN][0]);
+		if (yaku[FAN][0] <= 7) {
+			printf("跳満\t");
+			printf("12000点\n");
+		} else if (yaku[FAN][0] <= 10) {
+			printf("倍満\t");
+			printf("16000点\n");
+		} else if (yaku[FAN][0] <= 12) {
+			printf("三倍満\t");
+			printf("24000点\n");
+		}
+	}
+	if (yaku[SUUAN][0] >= 1)
+	printf("\n四暗刻");
+	if (yaku[TYUUREN][0] >= 1)
+	printf("\n九蓮宝燈");
+	if (yaku[FAN][0] >= 13 || yakuman > 0) {
+		printf("\n役満");
+		printf("\t32000点\n");
+		}
+
+
+	}
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+
+回答：テンパイ
+
+#include<stdio.h>
+#include"hedda.h"
+
+int answer_tenpai() {
+
+	printf("どれを捨てますか？");
+	scanf_s("%d", &sutehai);
+	qsort(tehai_data, 13, sizeof(int), compareInt);
+	flag_sute++;
+
+
+
+	if(sutehai<14){
+	for (i = 0; i < 14; i++) {
+		if (i == sutehai - 1) {
+			sutehai = tehai_data[i];
+			break;
+		}
+
+	}
+	furiwake(sutehai);
+
+	if (sutehai >= 0 && sutehai <= 8) {					//エラー回避用
+		tehai[sutehai]--;
+	}
+	}
+	if (sutehai == 14)
+		tehai[tumohai] --;
+
+	tumo_check = 0;
+	flag_sute = 0;
+	if(sutehai >= 1 && sutehai <=9){					//エラー回避用
+		tehai_data[sutehai - 1] = draw;	
+	}
+	
+
+	qsort(tehai_data, 13, sizeof(int), compareInt);
+
+	//for (n = 0; n < 13; n++) {
+		//furiwake(tehai_data[n]);
+	//}
+	for (i = 0; i < 9; i++)
+		haihyouji(tehai);
+
+	printf("\n");
+
+	for (i = 0; i < 13; i++) {
+		printf("萬 ");
+	}
+
+	//テスト用
+	/*tehai[0] = 1;
+	tehai[1] = 1;
+	tehai[2] = 2;
+	tehai[3] = 2;
+	tehai[4] = 1;
+	tehai[5] = 2;
+	tehai[6] = 3;
+	tehai[7] = 0;
+	tehai[8] = 1;*/
+
+	yaku_serch();
+
+	printf("※1牌ずつEnterを押して、最後に0でEnterを押して下さい\n");
+	printf("何待ちですか？：");
+	
+	while (j < 1) {
+		scanf_s("%d", &i);
+		user_mati[i] = 1;
+		if (i == 0)
+			j++;
+	}
+
+	for (i = 0; i <= 9; i++) {
+		if (mati[i] != 0) {
+			mati[i] = 1;
+		}
+	}
+
+	for (i = 1, j = 0; i <= 9; i++) {
+		if (mati[i] != user_mati[i]) {
+			printf("不正解です。。。");
+			break;
+		} else
+			j++;
+	}
+	if (j == 9) {
+		printf("正解です！おめでとう！");
+	}
+
+
+	for (i = 0; i <= 9; i++) {
+		if (mati[i] != 0) {
+			printf("\n%d", i);
+			
+		}
+		if (i >= 9)
+			printf("待ち");
+	}if (flag_furiten == 1) {
+		printf("\n※フリテンです※");
+	}
+
+}
+
+
+----------------------------------------------------------------------------------------------
+
+
+回答：ノーテン
+
+#include<stdio.h>
+#include"hedda.h"
+
+int answer_noten() {
+
+	tehai_data[13] = draw;
+	for (i = 0; i < 9; i++) {
+		kaburi[i] = 0;
+		tehai[i] = 0;
+	}
+
+	qsort(tehai_data, 13, sizeof(int), compareInt);
+
+	for (i = 0; i < 14; i++) {
+		furiwake(tehai_data[i]);
+	}
+	printf("\n");
+
+	
+	//デバッグ用
+	/*tehai[0] = 1;
+	tehai[1] = 2;
+	tehai[2] = 2;
+	tehai[3] = 2;
+	tehai[4] = 1;
+	tehai[5] = 2;
+	tehai[6] = 3;
+	tehai[7] = 0;
+	tehai[8] = 1;*/
+
+
+
+	yaku_serch();
+
+	if (flag_agari != 0) {
+		printf("上がれてます！");
+		return 0;										//上がれるか判定
+	}
+
+	for (j= 0, e = 0; j < 9; j++) {							//聴牌判定
+		c = 0; f = 0; e = 0;
+		for (i = 0; i < 4; i++) {
+			int temp = tehai[i];
+			tehai[i] = tehai[8 - i];
+			tehai[8 - i] = temp;
+		}
+
+		if (tehai[j] != 0) {
+			tehai[j] --;
+			if (debug == 1) {
+				printf("%d捨て", j + 1);
+			}
+		}
+		else {
+			e++;
+			i++;
+		}
+		if (e == 0) {							//c = 0 f = 0入れる
+
+			r = 0;
+			yaku_serch();
+			tehai[j] += 1;
+			for (i = 0; i < 9; i++) {
+				if (mati[i] != 0) {
+					printf("テンパれてます！");
+
+					return 0;
+				}
+			}
+		}
+		
+	}printf("\nたしかに\n");
+}
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+牌整理関連
+
+#include<stdio.h>
+#include"hedda.h"
+
+void haihyouji() {							//牌表示　兼　0～35を一～九に振り分け	兼　ツモ牌の数値を区別
+	int n = 0;
+
+	for (; i < 9; ) {
+		if (tehai[i] != 0) {
+			break;
+		} else
+			break;
+	}
+
+	if (tehai[i] >= 0 && tehai[i] <= 9) {					//エラー回避用
+		n = tehai[i];
+	}
+	
+	
+	if (tumo_check == 1) {
+		n = 1;
+		i = tumohai;
+	}
+	for (; n > 0; n--) {
+
+
+
+		if (i == 0)
+			printf("一 ");
+		else if (i == 1)
+			printf("二 ");
+		else if (i == 2)
+			printf("三 ");
+		else if (i == 3)
+			printf("四 ");
+		else if (i == 4)
+			printf("伍 ");
+		else if (i == 5)
+			printf("六 ");
+		else if (i == 6)
+			printf("七 ");
+		else if (i == 7)
+			printf("八 ");
+		else if (i == 8)
+			printf("九 ");
+	}
+
+}
+
+
+void furiwake(int a) {
+	int b = 0;
+
+	if (a < 4)
+		b = 0;
+	else if (a < 8)
+		b = 1;
+	else if (a < 12)
+		b = 2;
+	else if (a < 16)
+		b = 3;
+	else if (a < 20)
+		b = 4;
+	else if (a < 24)
+		b = 5;
+	else if (a < 28)
+		b = 6;
+	else if (a < 32)
+		b = 7;
+	else if (a < 36)
+		b = 8;
+	if (flag_sute == 0) {
+		tehai[b]++;
+		tumohai = b;
+	}
+	if (flag_sute == 1) {
+		sutehai = b;
+	}
+}
+
+----------------------------------------------------------------------------------------------
+
+
+ソート
+
+#include<stdio.h>
+#include"hedda.h"
+
+int compareInt(const void *a, const void *b)			//並び替え
+{
+	int aNum = *(int *)a;
+	int bNum = *(int *)b;
+
+	if (aNum < bNum) {
+		return -1;
+	} else if (aNum > bNum) {
+		return 1;
+	}
+	return 0;
+}
+
+
+----------------------------------------------------------------------------------------------
+
+
+役作り周回
+
+#include<stdio.h>
+#include"hedda.h"
+
+void yaku_serch(){
+
+
+	for (i = 0; i < 9; i++) {
+		if (tehai[i] >= 2)
+			r++;
+	}
+//if (r == 7) {
+//	tiitoi++;
+//}
+
+	for (i = 0; r + 1 >= i; i++) {
+		printf("\n");
+		kotu_judge(tehai);
+	}
+	if (debug == 1) {
+		printf("\n\n刻子ジャッジ(昇順)終了\n");
+	}
+	for (i = 0; i < 4; i++) {
+		int temp = tehai[i];
+		tehai[i] = tehai[8 - i];
+		tehai[8 - i] = temp;
+	}
+	c = 0;
+	w = 1;
+
+	for (i = 0; r + 1 >= i; i++) {
+		printf("\n");
+		kotu_judge(tehai);
+	}
+	if (debug == 1) {
+		printf("\n\n刻子ジャッジ(降順)終了\n");
+	}
+	w = 0;
+
+	for (i = 0; i < 4; i++) {
+		int temp = tehai[i];
+		tehai[i] = tehai[8 - i];
+		tehai[8 - i] = temp;
+	}
+	for (i = 0; r + 1 >= i; i++) {
+		printf("\n");
+		syuntu_judge(tehai);
+	}
+	if (debug == 1) {
+		printf("\n\n順子ジャッジ(昇順)終了\n");
+	}
+	for (i = 0; i < 4; i++) {
+		int temp = tehai[i];
+		tehai[i] = tehai[8 - i];
+		tehai[8 - i] = temp;
+	}
+	f = 0;
+	w = 1;
+
+	for (i = 0; r + 1 >= i; i++) {
+		printf("\n");
+		syuntu_judge(tehai);
+	}
+	if (debug == 1) {
+		printf("\n\n順子ジャッジ(降順)終了\n");
+	}
+
+
+}
+
+----------------------------------------------------------------------------------------------
+
+
+
+
+役作り（刻子優先）
+
+#include<stdio.h>
+#include"hedda.h"
+
+
+void kotu_judge(int a[]) {							//刻子優先役作り
+	int b, kotu_tehai[9], x = 0, y = 0, h = 0, d = 0, i = 0;
+	atama = 0;
+	flag_mati = 0;
+	for (b = 0; b < 9; b++) {
+		kotu_tehai[b] = a[b];
+		if ((b == 0 || b == 8)
+			&& kotu_tehai[b] >= 1) {
+			yaotyu++;
+		}
+
+	}
+	if (kotu_tehai[0] == 3
+		&& kotu_tehai[8] == 3) {
+		for (b = 1; b < 8; b++) {
+			if (kotu_tehai[b] >= 1)
+				tyuren++;
+			if (kotu_tehai[b] >= 2)
+				tyuren += 2;
+			if (tyuren == 8) {
+				yaku[TYUUREN][0]++;
+				yaku_judge();
+			}
+		}
+	}
+	for (; atama < 1 && c < 9; c++) {
+		if (kotu_tehai[c] >= 2) {
+			if(debug == 1){
+			printf("\n%d頭", c + 1);
+			}
+			atama++;
+			kotu_tehai[c] -= 2;
+			h = c;
+			if (w == 1)
+				h = 10 - (h + 1) - 1;
+
+
+		}
+	}
+	for (b = 0; b < 9; b++) {
+		if (kotu_tehai[b] >= 3) {
+			if (debug == 1) {
+			printf("\n%d刻子", b + 1);
+			}
+			koutu++;
+			kotu_tehai[b] -= 3;
+			b--;
+
+		}
+
+	}
+	for (b = 0; b < 9; b++) {
+		if (kotu_tehai[b] >= 2
+			&& kotu_tehai[b + 1] >= 2
+			&& kotu_tehai[b + 2] >= 2) {
+
+			if (debug == 1) {
+				printf("\n%d%d%d一盃口", b + 1, b + 2, b + 3);
+			}
+			if (b == 0 && ittu == 0)
+				ittu++;
+
+			if (b == 3 && ittu < 2)
+				ittu++;
+
+			if (b == 6)
+				ittu++;
+
+			iipei++;
+			syuntu += 2;
+
+			if ((b != 0 && b != 6)
+				&& (tumohai == b + 2 || tumohai == b))
+				pinflag = 1;
+
+			kotu_tehai[b] -= 2, kotu_tehai[b + 1] -= 2, kotu_tehai[b + 2] -= 2;
+			b--;
+
+		} else if (kotu_tehai[b] >= 1
+			&& kotu_tehai[b + 1] >= 1
+			&& kotu_tehai[b + 2] >= 1) {
+
+			if (debug == 1) {
+				printf("\n%d%d%d順子", b + 1, b + 2, b + 3);
+			}
+			if (b == 0 && ittu == 0)
+				ittu++;
+
+			if (b == 3 && ittu < 2)
+				ittu++;
+
+			if (b == 6)
+				ittu++;
+
+			syuntu++;
+
+			if ((b != 0 && b != 6)
+				&& (tumohai == b + 2 || tumohai == b))
+				pinflag = 1;
+
+			kotu_tehai[b] -= 1, kotu_tehai[b + 1] -= 1, kotu_tehai[b + 2] -= 1;
+			b--;
+		}
+	}
+	for (i = 0; i < 4 && w == 1; i++) {
+		int temp = kotu_tehai[i];
+		kotu_tehai[i] = kotu_tehai[8 - i];
+		kotu_tehai[8 - i] = temp;
+	}
+
+	for (b = 0; b < 9; b++) {
+
+		if (kotu_tehai[b] != 0) {		//余り物チェック
+			amari += kotu_tehai[b];
+			flag_mati++;				//待ち移行フラグ
+
+			if (kotu_tehai[b] == 2) {
+				d = b;
+				atama++;
+
+			}
+			if (flag_mati == 1)
+				x = b;
+			if (flag_mati == 2)
+				y = b;
+		}
+	}
+
+	mati_judge(x, y, h, d, yaku_syukai);
+
+}
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+役作り（順子優先）
+
+#include<stdio.h>
+#include"hedda.h"
+
+void syuntu_judge(int a[]) {						//順子優先役作り
+	int b, syuntu_tehai[9], x = 0, y = 0, h = 0, d = 0, i = 0;
+	atama = 0;
+	flag_mati = 0;
+
+	for (b = 0; b < 9; b++) {
+		syuntu_tehai[b] = a[b];
+
+		if ((b == 0 || b == 8)
+			&& syuntu_tehai[b] >= 1) {
+			yaotyu++;
+		}
+
+	}
+	if (syuntu_tehai[0] == 3 && syuntu_tehai[8] == 3) {
+
+		for (b = 1; b < 8; b++) {
+			if (syuntu_tehai[b] >= 1)
+				tyuren++;
+			if (syuntu_tehai[b] >= 2)
+				tyuren += 2;
+			if (tyuren == 8) {
+				yaku[TYUUREN][0]++;
+				yaku_judge();
+			}
+		}
+	}
+	for (; atama < 1 && f < 9; f++) {
+
+		if (syuntu_tehai[f] >= 2) {
+			if (debug == 1) {
+				printf("\n%d頭", f + 1);
+			}
+			atama++;
+			syuntu_tehai[f] -= 2;
+			h = f;
+			if (w == 1)
+				h = 10 - (h + 1) - 1;
+		}
+	}
+
+	for (b = 0; b < 9; b++) {
+
+		if (syuntu_tehai[b] >= 2
+			&& syuntu_tehai[b + 1] >= 2
+			&& syuntu_tehai[b + 2] >= 2) {
+
+			if (debug == 1) {
+				printf("\n%d%d%d一盃口", b + 1, b + 2, b + 3);
+			}
+			if ((b != 0 && b != 6)
+				&& (tumohai == b + 2 || tumohai == b))
+				pinflag = 1;
+
+			syuntu_tehai[b] -= 2, syuntu_tehai[b + 1] -= 2, syuntu_tehai[b + 2] -= 2;
+			b--;
+			iipei++;
+			syuntu += 2;
+
+		} else if (syuntu_tehai[b] >= 1
+			&& syuntu_tehai[b + 1] >= 1
+			&& syuntu_tehai[b + 2] >= 1) {
+
+			if (debug == 1) {
+				printf("\n%d%d%d順子", b + 1, b + 2, b + 3);
+			}
+			syuntu++;
+
+			if ((b != 0 && b != 6)
+				&& (tumohai == b + 2 || tumohai == b))
+				pinflag = 1;
+
+			syuntu_tehai[b] -= 1, syuntu_tehai[b + 1] -= 1, syuntu_tehai[b + 2] -= 1;
+			b--;
+
+		} else if (syuntu_tehai[b] == 3) {
+			if (debug == 1) {
+				printf("\n%d刻子", b + 1);
+			}
+			koutu++;
+			syuntu_tehai[b] -= 3;
+			b--;
+		}
+	}
+	for (i = 0; i < 4 && w == 1; i++) {
+		int temp = syuntu_tehai[i];
+		syuntu_tehai[i] = syuntu_tehai[8 - i];
+		syuntu_tehai[8 - i] = temp;
+	}
+	for (b = 0; b < 9; b++) {
+
+		if (syuntu_tehai[b] != 0) {			//余り物チェック
+			amari += syuntu_tehai[b];
+			flag_mati++;					//待ち移行フラグ
+
+			if (syuntu_tehai[b] == 2) {
+				d = b;
+				atama++;
+
+			}
+
+			if (flag_mati == 1) {
+				x = b;
+
+			}
+			if (flag_mati == 2) {
+				y = b;
+
+			}
+		}
+
+	}
+	mati_judge(x, y, h, d);
+}
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+待ち判定
+
+#include<stdio.h>
+#include"hedda.h"
+
+void mati_judge(int x, int y, int h, int d) {	//リーチ時なら何待ちか表示　amariが0なら役判定(yaku_judge)へ　リーチかけれない処理未完成
+
+	int i, j = 0;
+
+
+	if (amari == 0) {
+		yaku_judge();
+	} else if (tiitoi >= 1)
+		if (iipei == 2) {
+			tiitoi = 0;
+			yaku_judge();
+		}
+	if (amari > 3 && r == 7) {
+		iipei = 0;
+		yaku_judge();
+	}
+	if (amari < 3 && yaku_syukai == 0) {							//tehai[n]に4牌ある時は出力はじくプログラム入れる予定
+
+		if (r > 6) {
+			if (debug == 1) {
+				printf("七対子");
+			}
+		} else if (atama > 1) {
+			if (debug == 1) {
+				printf("\n%d、%d刻子アタマ待ち", h + 1, d + 1);
+			}
+			mati[h + 1]++; mati[d + 1]++;
+			if ((sutehai  == h)  || (sutehai == d) )
+				flag_furiten = 1;
+		} else if (flag_mati == 1) {
+			if (debug == 1) {
+				printf("\n%dアタマ単騎待ち", x + 1);
+			}
+			mati[x + 1]++;
+			if (sutehai == x )
+				flag_furiten = 1;
+		}if(atama >= 1){
+		if (flag_mati == 2) {
+			if (x + 2 == y) {
+				if (debug == 1) {
+					printf("\n%d待ち", x + 2);
+				}
+				mati[x + 2]++;
+				if (sutehai  == x + 1)
+					flag_furiten = 1;
+			} else if (x != 0 && x != 7
+				&& (x + 1 == y && x > 0)) {
+				if (debug == 1) {
+					printf("\n%d、%d待ち", x, x + 3);					//両面待ち
+				}
+				mati[x]++; mati[x + 3]++;
+				if ((sutehai + 1) == x || (sutehai + 1) == x + 3)			//
+					flag_furiten = 1;
+			} else if (x + 1 == y && x == 0) {						// 1 2→3待ち		
+				if (debug == 1) {
+					printf("\n%d待ち", x + 3);
+				}
+				mati[x + 3]++;
+				if (sutehai + 1 == x + 3)
+					flag_furiten = 1;
+			} else if (x == 7 && y == 8) {							// 8 9→7待ち			
+				if (debug == 1) {
+					printf("\n%d待ち", x);
+				}
+				mati[x]++;
+				if (sutehai + 1 == x)
+					flag_furiten = 1;
+			}
+		}
+		}
+	} if (amari >= 3 && r >= 6 && final_answer == 1) {
+		for (i = 0; i < 9; i++) {
+			if (tehai[i] == 1) {
+				j = i + 1;
+				if (w == 0) {
+					if (debug == 1) {
+						printf("\n七対子%d単騎待ち", j);
+					}
+					if (sutehai == j)
+						flag_furiten = 1;
+				} else if (w == 1) {
+					j = 10 - j;
+					if (debug == 1) {
+						printf("\n七対子%d単騎待ち", j);
+					}
+					if (sutehai == j)
+						flag_furiten = 1;
+				}
+			}
+		}
+	}
+
+
+	flag_mati = 0;
+	amari = 0;
+	iipei = 0, ittu = 0, koutu = 0, syuntu = 0, yaotyu = 0, tyuren = 0;
+
+	for (i = 0; i < 10; i++) {
+		yaku[i][yaku_syukai] = 0;
+	}
+}
+
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+役判定
+
+#include<stdio.h>
+
+#include"hedda.h"
+
+
+void yaku_judge() {								//上がり時の役条件確認
+
+	if (yaotyu == 0) {
+		yaku[TANYAO][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 1;
+	}
+	if (syuntu == 4 && pinflag == 1) {
+		yaku[PINFU][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 1;
+	}
+	if (koutu == 3) {
+		yaku[SANAN][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 2;
+	}
+	if (koutu == 4) {
+		yaku[SUUAN][yaku_syukai]++;
+		yakuman++;
+	}
+	if (ittu >= 3) {
+		yaku[ITTU][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 2;
+	}
+	if (iipei == 1) {
+		yaku[IIPEI][yaku_syukai]++;
+		yaku[FAN][yaku_syukai]++;
+	}
+	if (iipei == 2) {
+		yaku[RYANPEI][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 3;
+	}
+	if (tiitoi >= 1 && yaku[RYANPEI][yaku_syukai] == 0) {
+		yaku[TIITOI][yaku_syukai]++;
+		yaku[FAN][yaku_syukai] += 2;
+		tiitoi = 0;
+	}
+	if (yaku[TYUUREN][yaku_syukai] == 1) {
+		yakuman++;
+	}
+	if (yaku[FAN][0] < yaku[FAN][1]) {
+		for (i = 0; i < 10; i++) {
+			yaku[i][0] = yaku[i][1];
+		}
+	}
+	if (yaku_syukai < 1)
+		yaku_syukai++;
+
+	flag_agari = 1;
+}
